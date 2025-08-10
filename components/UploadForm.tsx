@@ -11,19 +11,16 @@ export default function UploadForm() {
     e.preventDefault();
     setStatus("Analyzing…");
 
-    // Make bucket robust: use env var, else default to the bucket you created
     const bucket = process.env.NEXT_PUBLIC_STORAGE_BUCKET || "article-images";
-
     let imageUrl: string | null = null;
 
-    // If a file was chosen, upload it first
+    // Upload image first (if provided)
     if (file) {
       try {
         const filename = `${Date.now()}-${file.name}`;
-        const { data, error } = await supabase.storage
+        const { error } = await supabase.storage
           .from(bucket)
           .upload(filename, file, { upsert: false });
-
         if (error) {
           setStatus("Upload failed: " + error.message);
           return;
@@ -36,17 +33,27 @@ export default function UploadForm() {
       }
     }
 
-    // Build payload: only include imageUrl if present to avoid validation errors
+    // Build payload; only include imageUrl if present
     const analyzePayload: any = { text };
     if (imageUrl) analyzePayload.imageUrl = imageUrl;
 
+    // ---- ANALYZE ----
     let analyze: any;
     try {
       const analyzeRes = await fetch("/api/analyze", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(analyzePayload),
       });
-      analyze = await analyzeRes.json();
+
+      const analyzeText = await analyzeRes.text();
+      try {
+        analyze = analyzeText ? JSON.parse(analyzeText) : {};
+      } catch {
+        setStatus("Analyze failed: " + analyzeText.slice(0, 200));
+        return;
+      }
+
       if (!analyzeRes.ok) {
         setStatus("Analyze failed: " + (analyze?.error || analyzeRes.statusText));
         return;
@@ -56,31 +63,39 @@ export default function UploadForm() {
       return;
     }
 
-    // Optional research
+    // ---- RESEARCH (optional) ----
     let research = { results: [] as any[] };
     try {
       if (analyze?.needs_research && analyze?.research_query) {
         setStatus("Researching…");
         const res = await fetch("/api/research", {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ query: analyze.research_query }),
         });
-        research = await res.json();
+        const txt = await res.text();
+        research = txt ? JSON.parse(txt) : { results: [] };
       }
     } catch (err: any) {
-      // research is optional; proceed even if it fails
       console.warn("Research error:", err);
     }
 
-    // Write the article
+    // ---- GENERATE ARTICLE ----
     setStatus("Writing article…");
     let article: any;
     try {
       const genRes = await fetch("/api/generate-article", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, imageUrl, analyze, research }),
       });
-      article = await genRes.json();
+      const txt = await genRes.text();
+      try {
+        article = txt ? JSON.parse(txt) : {};
+      } catch {
+        setStatus("Article generation failed: " + txt.slice(0, 200));
+        return;
+      }
       if (!genRes.ok) {
         setStatus("Article generation failed: " + (article?.error || genRes.statusText));
         return;
@@ -90,15 +105,22 @@ export default function UploadForm() {
       return;
     }
 
-    // Make a lead image
+    // ---- GENERATE IMAGE ----
     setStatus("Generating image…");
     let img: any;
     try {
       const imgRes = await fetch("/api/generate-image", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image_prompt: article.hero_prompt }),
       });
-      img = await imgRes.json();
+      const txt = await imgRes.text();
+      try {
+        img = txt ? JSON.parse(txt) : {};
+      } catch {
+        setStatus("Image generation failed: " + txt.slice(0, 200));
+        return;
+      }
       if (!imgRes.ok) {
         setStatus("Image generation failed: " + (img?.error || imgRes.statusText));
         return;
@@ -108,19 +130,26 @@ export default function UploadForm() {
       return;
     }
 
-    // Publish
+    // ---- PUBLISH ----
     setStatus("Publishing…");
     try {
       const pubRes = await fetch("/api/publish", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...article, image_url: img.image_url }),
       });
-      const published = await pubRes.json();
+      const txt = await pubRes.text();
+      let published: any = {};
+      try {
+        published = txt ? JSON.parse(txt) : {};
+      } catch {
+        setStatus("Publish failed: " + txt.slice(0, 200));
+        return;
+      }
       if (!pubRes.ok) {
         setStatus("Publish failed: " + (published?.error || pubRes.statusText));
         return;
       }
-
       setStatus(null);
       window.location.href = `/articles/${published.slug}`;
     } catch (err: any) {
@@ -149,9 +178,7 @@ export default function UploadForm() {
         Generate Article
       </button>
       {status && <p className="text-sm text-gray-600">{status}</p>}
-      <p className="text-xs text-gray-400">
-        Tip: include both an image and text for best results.
-      </p>
+      <p className="text-xs text-gray-400">Tip: include both an image and text for best results.</p>
     </form>
   );
 }
