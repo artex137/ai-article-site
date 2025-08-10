@@ -13,11 +13,11 @@ export async function POST(req: Request) {
       image_prompt ||
       "Photorealistic editorial image, neutral background, high detail.";
 
-    // Use a supported size for gpt-image-1
+    // Use a size that's accepted by your SDK typings and API
     const img = await openai.images.generate({
       model: "gpt-image-1",
       prompt,
-      size: "1536x1024", // valid: 1024x1024, 1024x1536, 1536x1024, or 'auto'
+      size: "1024x1024", // <= compatible with your SDK typings
     });
 
     const b64 = img?.data?.[0]?.b64_json;
