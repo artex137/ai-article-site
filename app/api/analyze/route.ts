@@ -3,10 +3,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { openai } from "@/lib/openai";
 
-// Force Node runtime (not Edge) so outbound HTTPS to OpenAI is reliable
 export const runtime = "nodejs";
 
-// Accept any non-empty string for imageUrl; normalize blanks/"undefined"/null to null
+// Accept any non-empty string for imageUrl; normalize blanks to null
 const Body = z.object({
   text: z.string().optional(),
   imageUrl: z
@@ -33,17 +32,26 @@ export async function POST(req: Request) {
 
     const { text, imageUrl } = Body.parse(await req.json());
 
+    // Build a multimodal message following Chat Completions spec:
+    // content is an array of items with type "text" or "image_url"
+    const userContent: any[] = [
+      { type: "text", text: text || "No text provided." },
+    ];
+    if (imageUrl) {
+      userContent.push({
+        type: "image_url",
+        image_url: { url: imageUrl },
+      });
+    }
+
     const messages: any[] = [
       {
         role: "system",
         content:
           "You analyze the user's upload to infer their intent. Return JSON with fields: topic, intent_summary, needs_research (boolean), research_query.",
       },
-      { role: "user", content: [{ type: "text", text: text || "No text provided." }] },
+      { role: "user", content: userContent },
     ];
-    if (imageUrl) {
-      messages[1].content.push({ type: "input_image", image_url: imageUrl });
-    }
 
     const resp = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -67,9 +75,8 @@ export async function POST(req: Request) {
     });
   } catch (err: any) {
     console.error("analyze error:", err?.message || err);
-    // Always return JSON so the client never hits "Unexpected end of JSON input"
     return NextResponse.json(
-      { error: String(err?.message || err || "Analyze failed") },
+      { error: String(err?.message || "Analyze failed") },
       { status: 500 }
     );
   }
