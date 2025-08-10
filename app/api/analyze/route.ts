@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { openai } from "@/lib/openai";
 
-// Normalize imageUrl: "", undefined, null, "undefined" → null; otherwise must be a valid URL
+// Accept ANY non-empty string for imageUrl. Normalize blanks/undefined to null.
 const Body = z.object({
   text: z.string().optional(),
   imageUrl: z
@@ -11,10 +11,10 @@ const Body = z.object({
       if (typeof v === "string") {
         const t = v.trim();
         if (!t || t === "undefined" || t === "null") return null;
-        return t;
+        return t; // <- do NOT validate as URL anymore
       }
       return null;
-    }, z.string().url().nullable())
+    }, z.string().nullable())
     .optional(),
 });
 
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       { role: "user", content: [{ type: "text", text: text || "No text provided." }] },
     ];
 
-    // Only include the image if we truly have a valid URL
+    // Only include the image if we truly have a (non-empty) string
     if (imageUrl) {
       messages[1].content.push({ type: "input_image", image_url: imageUrl });
     }
