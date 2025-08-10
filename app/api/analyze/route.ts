@@ -1,39 +1,62 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { openai } from "@/lib/openai";
 
-const Body = z.object({ query: z.string() });
+// Accept text optional, imageUrl optional & nullable
+const Body = z.object({
+  text: z.string().optional(),
+  imageUrl: z.string().url().optional().nullable(),
+});
 
 export async function POST(req: Request) {
   try {
-    const { query } = Body.parse(await req.json());
+    const { text, imageUrl } = Body.parse(await req.json());
 
-    const key = process.env.TAVILY_API_KEY;
-    if (!key) {
-      // No key? Still return a valid JSON shape.
-      return NextResponse.json({ results: [] });
+    const messages: any[] = [
+      {
+        role: "system",
+        content:
+          "You analyze the user's upload to infer their intent. Return JSON with fields: topic, intent_summary, needs_research (boolean), research_query.",
+      },
+      { role: "user", content: [{ type: "text", text: text || "No text provided." }] },
+    ];
+
+    if (imageUrl) {
+      messages[1].content.push({
+        type: "input_image",
+        image_url: imageUrl,
+      });
     }
 
-    const res = await fetch("https://api.tavily.com/search", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Tavily-Api-Key": key,
-      },
-      body: JSON.stringify({ query, max_results: 5 }),
+    // Call OpenAI and request a JSON object response
+    const resp = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages,
+      response_format: { type: "json_object" },
+      temperature: 0.4,
     });
 
-    const text = await res.text();
+    const raw = resp.choices?.[0]?.message?.content ?? "{}";
+
+    // Safe parse
     let data: any = {};
     try {
-      data = text ? JSON.parse(text) : {};
+      data = JSON.parse(raw);
     } catch {
       data = {};
     }
 
-    const results = Array.isArray(data?.results) ? data.results : [];
-    return NextResponse.json({ results });
+    return NextResponse.json({
+      needs_research: Boolean(data.needs_research),
+      research_query: data.research_query || data.topic || text || "",
+      intent_summary: data.intent_summary || "General interest",
+    });
   } catch (err: any) {
-    console.error("research error:", err?.message || err);
-    return NextResponse.json({ results: [], error: "research failed" }, { status: 500 });
+    console.error("analyze error:", err?.message || err);
+    // Always return JSON on error so the client never sees "Unexpected end of JSON input"
+    return NextResponse.json(
+      { error: err?.message || "Analyze failed" },
+      { status: 500 }
+    );
   }
 }
