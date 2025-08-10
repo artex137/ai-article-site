@@ -25,8 +25,21 @@ export default function UploadForm() {
           setStatus("Upload failed: " + error.message);
           return;
         }
+
         const { data: pub } = supabase.storage.from(bucket).getPublicUrl(filename);
-        imageUrl = pub.publicUrl || null;
+        // SANITIZE: remove any whitespace/newlines embedded in the URL
+        const rawUrl = pub?.publicUrl || "";
+        const cleaned =
+          rawUrl.trim().replace(/\s+/g, ""); // removes \n, \r, \t, spaces that slipped inside
+        imageUrl = cleaned || null;
+
+        // Optional: quick validation for debugging
+        try {
+          // Will throw if malformed
+          new URL(imageUrl!);
+        } catch {
+          console.warn("Public URL looked malformed, got:", imageUrl);
+        }
       } catch (err: any) {
         setStatus("Upload failed: " + (err?.message || "unknown error"));
         return;
