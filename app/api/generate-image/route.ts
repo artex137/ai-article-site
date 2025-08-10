@@ -1,6 +1,9 @@
+// app/api/generate-image/route.ts
 import { NextResponse } from "next/server";
 import { openai } from "@/lib/openai";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
@@ -8,13 +11,13 @@ export async function POST(req: Request) {
 
     const prompt =
       image_prompt ||
-      "Photorealistic editorial image, neutral background, high detail, 1792x1024.";
+      "Photorealistic editorial image, neutral background, high detail.";
 
-    // Generate image via OpenAI (base64)
+    // Use a supported size for gpt-image-1
     const img = await openai.images.generate({
       model: "gpt-image-1",
       prompt,
-      size: "1792x1024",
+      size: "1536x1024", // valid: 1024x1024, 1024x1536, 1536x1024, or 'auto'
     });
 
     const b64 = img?.data?.[0]?.b64_json;
@@ -26,11 +29,9 @@ export async function POST(req: Request) {
     }
 
     const bytes = Buffer.from(b64, "base64");
-
     const bucket = process.env.NEXT_PUBLIC_STORAGE_BUCKET || "article-images";
     const name = `hero-${Date.now()}.png`;
 
-    // Upload to Supabase Storage
     const { error } = await supabaseAdmin.storage.from(bucket).upload(name, bytes, {
       contentType: "image/png",
       upsert: false,
@@ -41,7 +42,6 @@ export async function POST(req: Request) {
 
     const { data: pub } = supabaseAdmin.storage.from(bucket).getPublicUrl(name);
     const image_url = pub?.publicUrl;
-
     if (!image_url) {
       return NextResponse.json({ error: "no public url returned" }, { status: 500 });
     }
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error("generate-image error:", err?.message || err);
     return NextResponse.json(
-      { error: err?.message || "image generation failed" },
+      { error: String(err?.message || "image generation failed") },
       { status: 500 }
     );
   }
