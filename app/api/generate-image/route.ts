@@ -9,11 +9,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing image prompt" }, { status: 400 });
     }
 
-    // Use DALL·E 3 instead of gpt-image-1
+    // Use DALL·E 3 with widescreen size
     const result = await openai.images.generate({
       model: "dall-e-3",
       prompt: image_prompt,
-      size: "1024x1024", // valid sizes for DALL·E 3: 1024x1024, 1024x1536, 1536x1024
+      size: "1536x1024", // widescreen format
       quality: "high"
     });
 
