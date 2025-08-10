@@ -9,12 +9,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing image prompt" }, { status: 400 });
     }
 
-    // Generate image with DALL·E 3 widescreen size
+    // Generate image with DALL·E 3 widescreen format
     const result = await openai.images.generate({
       model: "dall-e-3",
       prompt: image_prompt,
-      size: "1536x1024" as any, // bypass type restriction
-      quality: "hd" // valid value for type checking
+      size: "1792x1024", // valid widescreen
+      quality: "hd" // valid quality option
     });
 
     const url = result.data[0]?.url;
