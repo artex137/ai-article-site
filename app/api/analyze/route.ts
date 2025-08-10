@@ -2,10 +2,20 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { openai } from "@/lib/openai";
 
-// Accept text optional, imageUrl optional & nullable
+// Normalize imageUrl: "", undefined, null, "undefined" → null; otherwise must be a valid URL
 const Body = z.object({
   text: z.string().optional(),
-  imageUrl: z.string().url().optional().nullable(),
+  imageUrl: z
+    .preprocess((v) => {
+      if (v === undefined || v === null) return null;
+      if (typeof v === "string") {
+        const t = v.trim();
+        if (!t || t === "undefined" || t === "null") return null;
+        return t;
+      }
+      return null;
+    }, z.string().url().nullable())
+    .optional(),
 });
 
 export async function POST(req: Request) {
@@ -21,14 +31,11 @@ export async function POST(req: Request) {
       { role: "user", content: [{ type: "text", text: text || "No text provided." }] },
     ];
 
+    // Only include the image if we truly have a valid URL
     if (imageUrl) {
-      messages[1].content.push({
-        type: "input_image",
-        image_url: imageUrl,
-      });
+      messages[1].content.push({ type: "input_image", image_url: imageUrl });
     }
 
-    // Call OpenAI and request a JSON object response
     const resp = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages,
@@ -37,8 +44,6 @@ export async function POST(req: Request) {
     });
 
     const raw = resp.choices?.[0]?.message?.content ?? "{}";
-
-    // Safe parse
     let data: any = {};
     try {
       data = JSON.parse(raw);
@@ -53,10 +58,6 @@ export async function POST(req: Request) {
     });
   } catch (err: any) {
     console.error("analyze error:", err?.message || err);
-    // Always return JSON on error so the client never sees "Unexpected end of JSON input"
-    return NextResponse.json(
-      { error: err?.message || "Analyze failed" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Analyze failed" }, { status: 500 });
   }
 }
