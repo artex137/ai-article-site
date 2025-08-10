@@ -1,57 +1,39 @@
 import { NextResponse } from "next/server";
-import { openai } from "@/lib/openai";
 import { z } from "zod";
 
-// Allow null imageUrl
-const Body = z.object({
-  text: z.string().optional(),
-  imageUrl: z.string().url().optional().nullable(),
-});
+const Body = z.object({ query: z.string() });
 
 export async function POST(req: Request) {
   try {
-    const { text, imageUrl } = Body.parse(await req.json());
+    const { query } = Body.parse(await req.json());
 
-    const messages: any[] = [
-      {
-        role: "system",
-        content:
-          "You analyze the user's upload to infer their intent. Return JSON with fields: topic, intent_summary, needs_research (boolean), research_query.",
-      },
-      { role: "user", content: [{ type: "text", text: text || "No text provided." }] },
-    ];
-
-    if (imageUrl) {
-      messages[1].content.push({ type: "input_image", image_url: imageUrl });
+    const key = process.env.TAVILY_API_KEY;
+    if (!key) {
+      // No key? Still return a valid JSON shape.
+      return NextResponse.json({ results: [] });
     }
 
-    const resp = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages,
-      response_format: { type: "json_object" },
-      temperature: 0.4,
+    const res = await fetch("https://api.tavily.com/search", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Tavily-Api-Key": key,
+      },
+      body: JSON.stringify({ query, max_results: 5 }),
     });
 
-    const raw = resp.choices?.[0]?.message?.content ?? "{}";
-
+    const text = await res.text();
     let data: any = {};
     try {
-      data = JSON.parse(raw);
+      data = text ? JSON.parse(text) : {};
     } catch {
-      // Fallback if model didn't return valid JSON
       data = {};
     }
 
-    return NextResponse.json({
-      needs_research: Boolean(data.needs_research),
-      research_query: data.research_query || data.topic || text || "",
-      intent_summary: data.intent_summary || "General interest",
-    });
+    const results = Array.isArray(data?.results) ? data.results : [];
+    return NextResponse.json({ results });
   } catch (err: any) {
-    console.error("analyze error:", err);
-    return NextResponse.json(
-      { error: err?.message || "Analyze failed" },
-      { status: 500 }
-    );
+    console.error("research error:", err?.message || err);
+    return NextResponse.json({ results: [], error: "research failed" }, { status: 500 });
   }
 }
