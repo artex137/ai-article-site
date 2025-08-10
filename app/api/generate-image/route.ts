@@ -1,56 +1,32 @@
-// app/api/generate-image/route.ts
 import { NextResponse } from "next/server";
 import { openai } from "@/lib/openai";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
-
-export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
-    const { image_prompt } = (await req.json()) as { image_prompt?: string };
+    const { image_prompt } = await req.json();
 
-    const prompt =
-      image_prompt ||
-      "Photorealistic editorial image, neutral background, high detail.";
+    if (!image_prompt || typeof image_prompt !== "string") {
+      return NextResponse.json({ error: "Missing image prompt" }, { status: 400 });
+    }
 
-    // Use a size that's accepted by your SDK typings and API
-    const img = await openai.images.generate({
-      model: "gpt-image-1",
-      prompt,
-      size: "1024x1024", // <= compatible with your SDK typings
+    // Use DALL·E 3 instead of gpt-image-1
+    const result = await openai.images.generate({
+      model: "dall-e-3",
+      prompt: image_prompt,
+      size: "1024x1024", // valid sizes for DALL·E 3: 1024x1024, 1024x1536, 1536x1024
+      quality: "high"
     });
 
-    const b64 = img?.data?.[0]?.b64_json;
-    if (!b64) {
-      return NextResponse.json(
-        { error: "image generation returned no data" },
-        { status: 500 }
-      );
+    const url = result.data[0]?.url;
+    if (!url) {
+      return NextResponse.json({ error: "No image URL returned" }, { status: 500 });
     }
 
-    const bytes = Buffer.from(b64, "base64");
-    const bucket = process.env.NEXT_PUBLIC_STORAGE_BUCKET || "article-images";
-    const name = `hero-${Date.now()}.png`;
-
-    const { error } = await supabaseAdmin.storage.from(bucket).upload(name, bytes, {
-      contentType: "image/png",
-      upsert: false,
-    });
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    const { data: pub } = supabaseAdmin.storage.from(bucket).getPublicUrl(name);
-    const image_url = pub?.publicUrl;
-    if (!image_url) {
-      return NextResponse.json({ error: "no public url returned" }, { status: 500 });
-    }
-
-    return NextResponse.json({ image_url });
+    return NextResponse.json({ image_url: url });
   } catch (err: any) {
-    console.error("generate-image error:", err?.message || err);
+    console.error("generate-image error:", err);
     return NextResponse.json(
-      { error: String(err?.message || "image generation failed") },
+      { error: err?.message || "Image generation failed" },
       { status: 500 }
     );
   }
