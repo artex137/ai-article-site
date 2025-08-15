@@ -1,7 +1,8 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import ArticleCard from "@/components/ArticleCard";
-
-export const revalidate = 60; // ISR: revalidate list at most once per minute
 
 export default async function ArticlesPage() {
   const { data: articles, error } = await supabaseAdmin
