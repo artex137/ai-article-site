@@ -1,64 +1,93 @@
 // app/articles/page.tsx
-import ArticleCard from "@/components/ArticleCard";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import Link from "next/link";
+import { createClient } from "@supabase/supabase-js";
 
-export const revalidate = 60; // ISR: refresh the list at most once per minute
+// don't cache this page (always read latest)
+export const revalidate = 0;
+
+type Article = {
+  id: number;
+  title: string;
+  content: string | null;
+  image_url: string | null;
+  slug: string;
+  created_at: string | null;
+};
+
+function getPreview(html?: string | null, length = 140) {
+  if (!html) return "";
+  // very light strip of tags for preview
+  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return text.length > length ? text.slice(0, length) + "…" : text;
+}
 
 export default async function ArticlesPage() {
-  // Pull recent articles (adjust limit if you like)
-  const { data, error } = await supabaseAdmin
+  // Using the public URL + anon key is fine for server-side reads on a public table
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const supabase = createClient(supabaseUrl, supabaseAnon);
+
+  const { data, error } = await supabase
     .from("articles")
-    .select("slug,title,content,image_url,created_at,summary")
+    .select("id, title, content, image_url, slug, created_at")
     .order("created_at", { ascending: false })
-    .limit(48);
+    .limit(50);
 
   if (error) {
+    // show a friendly error so it's visible on the page if something goes wrong
     return (
-      <main className="mx-auto max-w-6xl px-4 py-10">
-        <h1 className="text-3xl font-bold text-gray-900">Articles</h1>
-        <p className="mt-6 rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-700">
-          Failed to load articles: {error.message}
-        </p>
-      </main>
+      <div className="max-w-6xl mx-auto p-6">
+        <h1 className="text-2xl font-semibold mb-4">Articles</h1>
+        <p className="text-red-600">Failed to load articles: {error.message}</p>
+      </div>
     );
   }
 
-  const items =
-    (data ?? []).map((row: any) => ({
-      slug: row.slug,
-      title: row.title,
-      // prefer summary if present, else make a short preview from content
-      summary:
-        row.summary ??
-        (typeof row.content === "string"
-          ? row.content.replace(/<[^>]+>/g, "").slice(0, 160) + "…"
-          : null),
-      image_url: row.image_url,
-      created_at: row.created_at,
-    })) ?? [];
+  const articles = (data ?? []) as Article[];
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10">
-      <div className="mb-8 flex items-end justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Articles</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Freshly generated stories, ranked by most recent.
-          </p>
-        </div>
-      </div>
+    <div className="max-w-6xl mx-auto p-6">
+      <h1 className="text-2xl font-semibold mb-6">Articles</h1>
 
-      {items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-300 p-12 text-center text-gray-500">
-          No articles yet. Create one from the <span className="font-medium">Upload</span> page.
-        </div>
+      {articles.length === 0 ? (
+        <p className="text-gray-500">No articles yet. Create one from the “Upload” page.</p>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map((a) => (
-            <ArticleCard key={a.slug} {...a} />
+          {articles.map((a) => (
+            <Link
+              key={a.id}
+              href={`/articles/${a.slug}`}
+              className="group rounded-2xl overflow-hidden border hover:shadow-lg transition"
+            >
+              {/* Using <img> avoids Next/Image domain config issues */}
+              {a.image_url ? (
+                <img
+                  src={a.image_url}
+                  alt={a.title}
+                  className="h-44 w-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="h-44 w-full bg-gray-100" />
+              )}
+
+              <div className="p-4">
+                <h2 className="text-lg font-semibold group-hover:underline">
+                  {a.title}
+                </h2>
+                <p className="mt-2 text-sm text-gray-600">
+                  {getPreview(a.content)}
+                </p>
+                {a.created_at && (
+                  <p className="mt-3 text-xs text-gray-400">
+                    {new Date(a.created_at).toLocaleString()}
+                  </p>
+                )}
+              </div>
+            </Link>
           ))}
         </div>
       )}
-    </main>
+    </div>
   );
 }
