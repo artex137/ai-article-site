@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import ArticleCard from "@/components/ArticleCard";
 import Link from "next/link";
@@ -14,14 +17,9 @@ export default async function HomePage() {
       <header className="mb-8 flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-bold">Featured</h1>
-          <p className="text-sm text-gray-500">
-            The latest pieces generated with Infotain.
-          </p>
+          <p className="text-sm text-gray-500">The latest pieces generated with Infotain.</p>
         </div>
-        <Link
-          href="/articles"
-          className="text-sm font-medium text-brand-700 hover:underline"
-        >
+        <Link href="/articles" className="text-sm font-medium text-brand-700 hover:underline">
           View all →
         </Link>
       </header>
