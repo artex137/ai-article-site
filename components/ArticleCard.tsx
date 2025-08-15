@@ -1,49 +1,54 @@
-// components/ArticleCard.tsx
 import Link from "next/link";
 
-type Props = {
-  slug: string;
+type Article = {
+  id: number;
   title: string;
-  summary?: string | null;
-  image_url?: string | null;
-  created_at?: string | null;
+  content: string | null;
+  image_url: string | null;
+  slug: string;
+  created_at: string;
 };
 
-export default function ArticleCard({
-  slug,
-  title,
-  summary,
-  image_url,
-  created_at,
-}: Props) {
-  const date = created_at ? new Date(created_at).toLocaleDateString() : "";
+function formatDate(iso: string) {
+  try {
+    return new Date(iso).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return "";
+  }
+}
+
+export default function ArticleCard({ article }: { article: Article }) {
   return (
-    <Link
-      href={`/articles/${slug}`}
-      className="group block rounded-2xl overflow-hidden border border-gray-200 hover:shadow-lg transition-shadow bg-white"
-    >
-      {image_url ? (
-        <div className="aspect-[16/9] w-full overflow-hidden bg-gray-100">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+    <article className="group rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition">
+      <Link href={`/articles/${article.slug}`} className="block">
+        {/* Use <img> instead of next/image to avoid domain config issues */}
+        {article.image_url ? (
           <img
-            src={image_url}
-            alt={title}
-            className="h-full w-full object-cover group-hover:scale-[1.02] transition-transform"
+            src={article.image_url}
+            alt={article.title}
+            className="h-48 w-full object-cover"
             loading="lazy"
           />
+        ) : (
+          <div className="h-48 w-full bg-gray-100" />
+        )}
+
+        <div className="p-4 space-y-2">
+          <h3 className="text-lg font-semibold leading-tight line-clamp-2 group-hover:text-brand-700">
+            {article.title}
+          </h3>
+          <p className="text-sm text-gray-500">{formatDate(article.created_at)}</p>
+          {article.content ? (
+            <p className="text-sm text-gray-600 line-clamp-3">
+              {article.content.replace(/<[^>]+>/g, "")}
+            </p>
+          ) : null}
         </div>
-      ) : (
-        <div className="aspect-[16/9] w-full bg-gradient-to-br from-emerald-50 to-emerald-100" />
-      )}
-      <div className="p-5">
-        <div className="text-xs text-gray-500">{date}</div>
-        <h3 className="mt-1 text-lg font-semibold text-gray-900 group-hover:text-emerald-700">
-          {title}
-        </h3>
-        {summary ? (
-          <p className="mt-2 line-clamp-3 text-sm text-gray-600">{summary}</p>
-        ) : null}
-      </div>
-    </Link>
+      </Link>
+    </article>
   );
 }
