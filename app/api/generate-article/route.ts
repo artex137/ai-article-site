@@ -1,86 +1,102 @@
 import { NextResponse } from "next/server";
 import { openai } from "@/lib/openai";
-import { z } from "zod";
+import { slugify } from "@/lib/slug";
 
-const Body = z.object({
-  text: z.string().optional(),
-  imageUrl: z.string().url().optional().nullable(),
-  analyze: z.any().optional(),
-  research: z
-    .object({
-      results: z.array(z.any()).optional(),
-    })
-    .optional(),
-});
+export const runtime = "nodejs";
+
+function bulletList(results: any[] = []) {
+  return results
+    .slice(0, 8)
+    .map((r) => `- ${r?.title || r?.url || ""}${r?.url ? ` (${r.url})` : ""}`)
+    .join("\n");
+}
 
 export async function POST(req: Request) {
   try {
-    const { text, imageUrl, analyze, research } = Body.parse(await req.json());
+    const { text = "", imageUrl = null, analyze = {}, research = { results: [] } } = await req.json();
 
-    const system = `You are a senior editor. Write a concise, factual, engaging article based on the user's upload and intent.
-- You are the overseer and writer.
-- Use research results only to augment understanding; never copy phrasing.
-- Include a strong headline and a short dek/summary.
-- Return JSON with: title, slug, summary, html, hero_prompt.`;
+    const focus = analyze?.focus || "";
+    const angle = analyze?.angle || "";
+    const headlineIdea = analyze?.headline_idea || "";
+    const keyPoints = Array.isArray(analyze?.key_points) ? analyze.key_points : [];
+    const entities = Array.isArray(analyze?.entities) ? analyze.entities : [];
+    const topics = Array.isArray(analyze?.topics) ? analyze.topics : [];
 
-    const messages: any[] = [
-      { role: "system", content: system },
-      {
-        role: "user",
-        content: `User text:\n${text || "(none)"}\n\nIntent: ${
-          analyze?.intent_summary || "General interest"
-        }`,
-      },
-    ];
-    if (imageUrl) messages.push({ role: "user", content: `User image URL: ${imageUrl}` });
-    if (research?.results?.length) {
-      messages.push({
-        role: "user",
-        content: `Supplementary research results (use as context only):\n${JSON.stringify(
-          research.results
-        )}`,
-      });
-    }
+    const researchBullets = bulletList(research?.results || []);
 
-    const resp = await openai.chat.completions.create({
+    const systemPrompt = `
+You are a veteran online news writer producing a stylized report that is easy to scan.
+Rules:
+- Neutral, fact-forward tone (AP-like), no hype, no speculation beyond sources.
+- Use short paragraphs (1–3 sentences), scannable subheads (<h2>), bullets (<ul><li>), and small callouts.
+- Include a small metadata header block and a Key Takeaways section.
+- Include a "What We Found" section tied to the user's focus/angle.
+- Include a "Context & Background" section leveraging research bullets.
+- Include an optional "What We Don't Know Yet" section if applicable.
+- Close with a "Sources" section listing the researched links.
+- Output clean HTML only (no <html> or <body>). No images; the site attaches a hero image separately.
+- Keep it 600–900 words if material allows. If less info exists, produce a concise but polished brief.
+`;
+
+    const userPrompt = `
+USER FOCUS: ${focus || "(not provided)"}
+ANGLE: ${angle || "(not provided)"}
+
+USER NOTES (verbatim):
+${text || "(none)"}
+
+ANALYZER KEYS:
+- Headline idea: ${headlineIdea || "(none)"}
+- Entities: ${entities.join(", ") || "(none)"}
+- Topics: ${topics.join(", ") || "(none)"}
+- Key points:
+${keyPoints.map((k: string) => `  - ${k}`).join("\n") || "  - (none)"}
+
+RESEARCH (titles & links):
+${researchBullets || "- (none)"}
+
+Now write the report. Sections to include in order:
+1) <h1>Headline informed by the user's focus</h1>
+2) A small meta bar (date/time; 1 sentence summary) -> use a <p class="meta">…</p>
+3) <h2>Key Takeaways</h2> with 3–6 bullets
+4) <h2>What We Found</h2> (tie directly to the uploaded content and analyzer focus)
+5) <h2>Context & Background</h2> (use the research bullets cautiously; do not overclaim)
+6) <h2>What We Don’t Know Yet</h2> (only if there are material unknowns or caveats)
+7) <h2>Sources</h2> as a <ul> of links (titles hyperlinked to URLs if available)
+
+Constraints:
+- If facts are unknown, say so plainly.
+- Never fabricate numbers, names, or quotes.
+- Keep HTML minimal: <h1>, <h2>, <p>, <ul><li>, <blockquote>, <a>.
+`;
+
+    const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      messages,
-      response_format: { type: "json_object" },
-      temperature: 0.6,
+      temperature: 0.35,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ]
     });
 
-    const raw = resp.choices?.[0]?.message?.content ?? "{}";
+    const html = completion.choices[0]?.message?.content?.trim() || "<p>Unable to generate report.</p>";
 
-    let data: any = {};
-    try {
-      data = raw ? JSON.parse(raw) : {};
-    } catch {
-      data = {};
-    }
+    // Title from <h1>
+    const titleMatch = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
+    const title =
+      (titleMatch && titleMatch[1].trim()) ||
+      headlineIdea ||
+      (focus ? `Report: ${focus}` : "Report");
 
-    // Normalize output to expected shape (never undefined)
+    const slug = slugify(title);
+
     return NextResponse.json({
-      title: data.title || "Untitled Article",
-      slug: data.slug || "untitled-article",
-      summary: data.summary || "",
-      html: data.html || "<p>(No content generated)</p>",
-      hero_prompt:
-        data.hero_prompt ||
-        "Photorealistic editorial image matching the article topic, clean lighting, 3:2.",
+      title,
+      slug,
+      content: html,
+      image_url: imageUrl || null
     });
   } catch (err: any) {
-    console.error("generate-article error:", err?.message || err);
-    return NextResponse.json(
-      {
-        error: "article generation failed",
-        title: "Untitled Article",
-        slug: "untitled-article",
-        summary: "",
-        html: "<p>(No content generated due to an error.)</p>",
-        hero_prompt:
-          "Simple neutral abstract image, soft gradient background, minimal, high-resolution.",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: err?.message || "generate-article failed" }, { status: 500 });
   }
 }
