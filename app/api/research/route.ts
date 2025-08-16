@@ -1,39 +1,55 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+// If you already have a tavily wrapper, use it. Otherwise, simple fetch below.
+// import { tavily } from "@/lib/tavily";
 
-const Body = z.object({ query: z.string() });
+export const runtime = "nodejs";
+
+type TavilyResult = {
+  title?: string;
+  url?: string;
+  content?: string;
+};
 
 export async function POST(req: Request) {
   try {
-    const { query } = Body.parse(await req.json());
-
-    const key = process.env.TAVILY_API_KEY;
-    if (!key) {
-      // No key? Still return a valid JSON shape.
+    const { query = "" } = await req.json();
+    if (!query || typeof query !== "string") {
       return NextResponse.json({ results: [] });
     }
 
+    // Direct fetch to Tavily (fallback if you don't use your wrapper):
     const res = await fetch("https://api.tavily.com/search", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Tavily-Api-Key": key,
+        "X-Tavily-Key": process.env.TAVILY_API_KEY || ""
       },
-      body: JSON.stringify({ query, max_results: 5 }),
+      body: JSON.stringify({
+        query,
+        search_depth: "advanced",
+        topic: "news",
+        max_results: 8,
+        include_answer: false,
+        include_raw_content: false
+      }),
+      // Keep server-side
+      cache: "no-store"
     });
 
-    const text = await res.text();
-    let data: any = {};
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch {
-      data = {};
+    if (!res.ok) {
+      const txt = await res.text();
+      return NextResponse.json({ error: txt || res.statusText, results: [] }, { status: 500 });
     }
 
-    const results = Array.isArray(data?.results) ? data.results : [];
+    const data = await res.json();
+    const results: TavilyResult[] = (data?.results || []).map((r: any) => ({
+      title: r.title,
+      url: r.url,
+      content: r.snippet || r.content || ""
+    }));
+
     return NextResponse.json({ results });
   } catch (err: any) {
-    console.error("research error:", err?.message || err);
-    return NextResponse.json({ results: [], error: "research failed" }, { status: 500 });
+    return NextResponse.json({ error: err?.message || "research failed", results: [] }, { status: 500 });
   }
 }
