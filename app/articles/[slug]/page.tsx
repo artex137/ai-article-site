@@ -4,11 +4,7 @@ export const dynamic = "force-dynamic";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { notFound } from "next/navigation";
 
-export default async function ArticlePage({
-  params,
-}: {
-  params: { slug: string };
-}) {
+export default async function ArticlePage({ params }: { params: { slug: string } }) {
   const { data, error } = await supabaseAdmin
     .from("articles")
     .select("title, content, image_url, created_at, slug")
@@ -21,11 +17,9 @@ export default async function ArticlePage({
   const html: string = typeof data.content === "string" ? data.content : "";
 
   return (
-    <article className="mx-auto max-w-4xl px-4 py-10">
-      {/* Breadcrumb / kicker */}
+    <article className="mx-auto max-w-3xl lg:max-w-4xl px-4 py-10">
       <div className="mb-3 text-xs uppercase tracking-wider text-gray-500">Report</div>
 
-      {/* Title + meta */}
       <header className="mb-6">
         <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">
           {data.title}
@@ -39,7 +33,6 @@ export default async function ArticlePage({
         </div>
       </header>
 
-      {/* Hero image */}
       {data.image_url && (
         <figure className="mb-8">
           <img
@@ -50,15 +43,11 @@ export default async function ArticlePage({
         </figure>
       )}
 
-      {/* Body */}
       <div
-        className="prose prose-article md:prose-article mx-auto text-gray-800
-                   prose-a:underline prose-a:decoration-[0.08em] prose-a:underline-offset-2
-                   prose-img:rounded-xl prose-hr:my-8"
+        className="prose prose-article mx-auto text-gray-800 prose-a:underline prose-a:decoration-[0.08em] prose-a:underline-offset-2 prose-img:rounded-xl prose-hr:my-8"
         dangerouslySetInnerHTML={{ __html: html }}
       />
 
-      {/* Bottom meta bar */}
       <footer className="mt-10 pt-6 border-t">
         <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-gray-500">
           <div>Filed under: <span className="font-medium text-gray-700">Latest Reports</span></div>
