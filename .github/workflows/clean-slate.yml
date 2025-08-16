@@ -1,3 +1,4 @@
+# .github/workflows/clean-slate.yml
 name: Clean Slate (delete all articles + bucket images)
 
 on:
@@ -11,14 +12,19 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       NEXT_PUBLIC_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_STORAGE_BUCKET }}
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - run: npm ci
+      # Use npm install (not npm ci) so it works without a lockfile
+      - name: Install dependencies
+        run: npm install
 
-      - name: Run wipe script
+      - name: Run clean slate script
         run: node scripts/clean-slate.mjs
