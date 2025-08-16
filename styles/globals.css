@@ -5,11 +5,27 @@
 /* Full-height baseline */
 html, body { height: 100%; }
 
+/* Site-wide niceties */
+a { text-underline-offset: 2px; }
+html { scroll-behavior: smooth; }
+
 /* Article content tweaks */
 .prose img { border-radius: 0.75rem; }
 
-/* Optional: subtle link underline offset site-wide */
-a { text-underline-offset: 2px; }
+/* Drop cap on first paragraph inside article body */
+.prose.prose-article > p:first-of-type::first-letter {
+  float: left;
+  font-size: 3rem;            /* ~48px */
+  line-height: 1;
+  padding-right: 0.35rem;
+  margin-top: 0.2rem;
+  font-weight: 800;
+  color: #111827;             /* gray-900 */
+}
 
-/* Optional: smooth scroll for heading anchors */
-html { scroll-behavior: smooth; }
+/* Softer hyphenation & wrapping for better rag */
+.prose p,
+.prose li {
+  hyphens: auto;
+  word-wrap: break-word;
+}
