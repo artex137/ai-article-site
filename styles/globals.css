@@ -2,30 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Full-height baseline */
 html, body { height: 100%; }
 
-/* Site-wide niceties */
 a { text-underline-offset: 2px; }
 html { scroll-behavior: smooth; }
 
-/* Article content tweaks */
+/* General article polish */
 .prose img { border-radius: 0.75rem; }
 
-/* Drop cap on first paragraph inside article body */
+/* Premium drop cap on first paragraph */
 .prose.prose-article > p:first-of-type::first-letter {
   float: left;
-  font-size: 3rem;            /* ~48px */
+  font-size: 2.75rem;
   line-height: 1;
   padding-right: 0.35rem;
   margin-top: 0.2rem;
   font-weight: 800;
-  color: #111827;             /* gray-900 */
+  color: #111827;
 }
 
-/* Softer hyphenation & wrapping for better rag */
-.prose p,
-.prose li {
-  hyphens: auto;
-  word-wrap: break-word;
+/* Desktop tuning: slightly smaller, tighter rhythm, shorter measure */
+@media (min-width: 1024px) {
+  .prose.prose-article { max-width: 68ch; }
+  .prose.prose-article p { font-size: 0.98rem; line-height: 1.8; }
+  .prose.prose-article h1 { font-size: 2.125rem; }
+  .prose.prose-article h2 { font-size: 1.25rem; margin-top: 1.6em; margin-bottom: 0.7em; }
+  .prose.prose-article h3 { font-size: 1.05rem; margin-top: 1.2em; margin-bottom: 0.5em; }
+  .prose.prose-article li { line-height: 1.7; }
 }
