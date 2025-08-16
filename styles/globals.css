@@ -7,21 +7,21 @@ html, body { height: 100%; }
 a { text-underline-offset: 2px; }
 html { scroll-behavior: smooth; }
 
-/* General article polish */
+/* Article images */
 .prose img { border-radius: 0.75rem; }
 
-/* Premium drop cap on first paragraph */
-.prose.prose-article > p:first-of-type::first-letter {
-  float: left;
-  font-size: 2.75rem;
-  line-height: 1;
-  padding-right: 0.35rem;
-  margin-top: 0.2rem;
-  font-weight: 800;
-  color: #111827;
+/* Remove drop cap + make first paragraph a subtle lead instead */
+.prose.prose-article > p:first-of-type {
+  font-size: 1.05rem;
+  line-height: 1.85;
+  font-weight: 500;
+  color: #374151; /* gray-700 */
 }
 
-/* Desktop tuning: slightly smaller, tighter rhythm, shorter measure */
+/* Better wrapping for long lines */
+.prose p, .prose li { hyphens: auto; word-wrap: break-word; }
+
+/* Desktop tuning */
 @media (min-width: 1024px) {
   .prose.prose-article { max-width: 68ch; }
   .prose.prose-article p { font-size: 0.98rem; line-height: 1.8; }
@@ -29,4 +29,12 @@ html { scroll-behavior: smooth; }
   .prose.prose-article h2 { font-size: 1.25rem; margin-top: 1.6em; margin-bottom: 0.7em; }
   .prose.prose-article h3 { font-size: 1.05rem; margin-top: 1.2em; margin-bottom: 0.5em; }
   .prose.prose-article li { line-height: 1.7; }
+}
+
+/* Pull quote style (if your HTML includes <blockquote>) */
+.prose blockquote {
+  border-left: 4px solid #059669; /* brand-600 */
+  padding-left: .9rem;
+  color: #374151;
+  font-style: italic;
 }
