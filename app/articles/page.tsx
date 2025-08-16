@@ -2,6 +2,8 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { ArticleCard } from "@/components/ArticleCard";
 
 export const metadata = { title: "Articles | AI Article Site" };
+export const revalidate = 0;            // no ISR cache
+export const dynamic = "force-dynamic"; // always fetch fresh
 
 export default async function ArticlesPage() {
   const { data } = await supabaseAdmin
