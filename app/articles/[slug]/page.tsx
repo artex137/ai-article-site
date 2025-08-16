@@ -4,6 +4,31 @@ export const dynamic = "force-dynamic";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { notFound } from "next/navigation";
 
+/** Remove “drop cap” patterns from the first paragraph, e.g.
+ *  <p><strong>E</strong>xploring …</p> or <p><span style="...">E</span>xploring …</p>
+ */
+function stripDropCap(html: string): string {
+  // remove the first <h1> if present (we already show page title above)
+  let out = html.replace(/<h1[^>]*>[\s\S]*?<\/h1>/i, "");
+
+  // normalize non-breaking spaces
+  out = out.replace(/&nbsp;/g, " ");
+
+  // target the FIRST <p> only
+  out = out.replace(
+    /<p([^>]*)>\s*(?:<(?:span|strong|b|em)[^>]*>\s*([A-Za-z])\s*<\/(?:span|strong|b|em)>\s*)([\s\S]*?)<\/p>/i,
+    (_m, attrs, letter, rest) => `<p${attrs ? attrs : ""}>${letter}${rest}</p>`
+  );
+
+  // also catch inline-styled drops like <span style="font-size:40px">E</span>
+  out = out.replace(
+    /<p([^>]*)>\s*<span[^>]*style="[^"]*font-size\s*:\s*(?:\d{2,}|[2-9]\d)px[^"]*"[^>]*>\s*([A-Za-z])\s*<\/span>\s*([\s\S]*?)<\/p>/i,
+    (_m, attrs, letter, rest) => `<p${attrs ? attrs : ""}>${letter}${rest}</p>`
+  );
+
+  return out;
+}
+
 export default async function ArticlePage({ params }: { params: { slug: string } }) {
   const { data, error } = await supabaseAdmin
     .from("articles")
@@ -15,15 +40,12 @@ export default async function ArticlePage({ params }: { params: { slug: string }
   if (!data) return notFound();
 
   const rawHtml: string = typeof data.content === "string" ? data.content : "";
-  // Remove the first <h1> from generated HTML to avoid double titles on page
-  const cleanedHtml = rawHtml.replace(/<h1[^>]*>[\s\S]*?<\/h1>/i, "").trim();
+  const cleanedHtml = stripDropCap(rawHtml).trim();
 
   return (
     <article className="mx-auto max-w-3xl lg:max-w-4xl px-4 py-10">
-      {/* Kicker */}
       <div className="mb-3 text-xs uppercase tracking-wider text-gray-500">Report</div>
 
-      {/* Page title + meta */}
       <header className="mb-6">
         <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">
           {data.title}
@@ -37,7 +59,6 @@ export default async function ArticlePage({ params }: { params: { slug: string }
         </div>
       </header>
 
-      {/* Hero image */}
       {data.image_url && (
         <figure className="mb-8">
           <img
@@ -48,7 +69,6 @@ export default async function ArticlePage({ params }: { params: { slug: string }
         </figure>
       )}
 
-      {/* Body (no drop cap; refined desktop rhythm) */}
       <div
         className="prose prose-article mx-auto text-gray-800
                    prose-a:underline prose-a:decoration-[0.08em] prose-a:underline-offset-2
