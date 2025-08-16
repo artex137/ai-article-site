@@ -27,16 +27,12 @@ export default function UploadForm() {
         }
 
         const { data: pub } = supabase.storage.from(bucket).getPublicUrl(filename);
-        // SANITIZE: remove any whitespace/newlines embedded in the URL
         const rawUrl = pub?.publicUrl || "";
-        const cleaned =
-          rawUrl.trim().replace(/\s+/g, ""); // removes \n, \r, \t, spaces that slipped inside
+        const cleaned = rawUrl.trim().replace(/\s+/g, "");
         imageUrl = cleaned || null;
 
-        // Optional: quick validation for debugging
         try {
-          // Will throw if malformed
-          new URL(imageUrl!);
+          new URL(imageUrl!); // validate
         } catch {
           console.warn("Public URL looked malformed, got:", imageUrl);
         }
@@ -118,38 +114,13 @@ export default function UploadForm() {
       return;
     }
 
-    // ---- GENERATE IMAGE ----
-    setStatus("Generating image…");
-    let img: any;
-    try {
-      const imgRes = await fetch("/api/generate-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image_prompt: article.hero_prompt }),
-      });
-      const txt = await imgRes.text();
-      try {
-        img = txt ? JSON.parse(txt) : {};
-      } catch {
-        setStatus("Image generation failed: " + txt.slice(0, 200));
-        return;
-      }
-      if (!imgRes.ok) {
-        setStatus("Image generation failed: " + (img?.error || imgRes.statusText));
-        return;
-      }
-    } catch (err: any) {
-      setStatus("Image generation failed: " + (err?.message || "unknown error"));
-      return;
-    }
-
     // ---- PUBLISH ----
     setStatus("Publishing…");
     try {
       const pubRes = await fetch("/api/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...article, image_url: img.image_url }),
+        body: JSON.stringify({ ...article, image_url: imageUrl }),
       });
       const txt = await pubRes.text();
       let published: any = {};
