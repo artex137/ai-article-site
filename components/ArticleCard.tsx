@@ -11,7 +11,7 @@ export function ArticleCard({ a }: { a: any }) {
             alt={a.title}
             width={600}
             height={300}
-            className="w-full h-48 object-cover"
+            className="w-full h-48 object-cover" // ensures uniform crop/resize
             unoptimized
           />
         ) : (
