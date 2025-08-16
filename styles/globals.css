@@ -1,5 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Full-height baseline */
 html, body { height: 100%; }
+
+/* Article content tweaks */
 .prose img { border-radius: 0.75rem; }
+
+/* Optional: subtle link underline offset site-wide */
+a { text-underline-offset: 2px; }
+
+/* Optional: smooth scroll for heading anchors */
+html { scroll-behavior: smooth; }
